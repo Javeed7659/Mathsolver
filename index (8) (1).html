@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI MathSnap - Instant Access</title>
+    
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Marked.js for Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f3f4f6;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden; /* Hide scrollbar during splash screen */
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- LOADING SPINNER STYLES --- */
+        .solver-ring-loader {
+            width: 28px;
+            height: 28px;
+            border: 4px solid rgba(255, 255, 255, 0.3); 
+            border-top-color: #ffffff; 
+            border-radius: 50%;
+            animation: ring-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            transform-origin: center center;
+        }
+
+        @keyframes ring-spin {
+            0% { transform: rotate(0deg); border-width: 4px; }
+            50% { transform: rotate(180deg); border-width: 8px; }
+            100% { transform: rotate(360deg); border-width: 4px; }
+        }
+        
+        /* --- SPLASH SCREEN STYLES --- */
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #6366f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease-out;
+        }
+        
+        @keyframes logoScaleBounce {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+
+        .splash-logo {
+            animation: logoScaleBounce 0.8s ease-out;
+            opacity: 1;
+        }
+
+        /* Hide app initially */
+        #appWrapper {
+            display: none; 
+        }
+
+
+        /* Markdown Styles */
+        .markdown-body h1 { font-size: 1.5em; font-weight: bold; margin-bottom: 0.5em; color: #1e293b; }
+        .markdown-body h2 { font-size: 1.25em; font-weight: bold; margin-bottom: 0.5em; margin-top: 1em; color: #334155; }
+        .markdown-body p { margin-bottom: 0.75em; line-height: 1.6; color: #475569; }
+        .markdown-body ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.75em; }
+        .markdown-body blockquote {
+            border-left: 4px solid #3b82f6; 
+            padding: 0.75em 1em;
+            color: #1e40af; 
+            background-color: #eff6ff; 
+            font-style: normal;
+            font-weight: 600; 
+            border-radius: 6px;
+            margin-top: 1em; 
+        }
+        
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center" onload="startAppInitialization()">
+
+    <!-- SPLASH SCREEN -->
+    <div id="splashScreen">
+        <div class="flex flex-col items-center text-white">
+            <!-- Logo Icon -->
+            <div class="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-4 shadow-xl splash-logo">
+                <i class="fa-solid fa-wand-magic-sparkles text-4xl text-indigo-600"></i>
+            </div>
+            <!-- App Name -->
+            <h1 class="text-4xl font-extrabold tracking-tight splash-logo">Snap<span class="font-light">Solve</span></h1>
+            <p class="text-sm mt-1 font-light text-indigo-200 splash-logo">AI Problem Solver</p>
+        </div>
+    </div>
+<!-- MAIN APP WRAPPER -->
+    <div id="appWrapper" class="w-full max-w-md flex flex-col gap-4 py-6 px-4">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800 tracking-tight">AI Snap<span class="text-indigo-600">Solve</span></h1>
+            </div>
+            <!-- Credits Display -->
+            <div id="creditsDisplay" class="px-3 py-2 bg-white rounded-full text-sm font-bold text-green-600 shadow-sm border border-green-200 flex items-center gap-1.5 transition-colors duration-300 hover:bg-green-50 cursor-pointer" onclick="showRedeemModal()">
+                <i class="fa-solid fa-coins text-yellow-500"></i>
+                <span id="creditsValue">--</span>
+            </div>
+        </header>
+        
+        <!-- Status Message -->
+        <div id="statusMessage" class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex gap-3 items-center text-sm text-indigo-800 font-medium">
+             <i class="fa-solid fa-check text-indigo-500"></i>
+             Ready to solve!
+        </div>
+
+        <!-- Main Upload Card -->
+        <div class="glass-panel bg-white rounded-3xl shadow-xl overflow-hidden">
+            <!-- Preview Area -->
+            <div class="relative bg-slate-100 min-h-[250px] flex flex-col items-center justify-center border-b border-slate-100 transition-all" id="dropZone">
+                
+                <!-- Placeholder State -->
+                <div id="uploadPlaceholder" class="flex flex-col items-center text-slate-400 p-8 text-center transition-opacity duration-300">
+                    <div class="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-camera text-3xl text-indigo-400"></i>
+                    </div>
+                    <p class="font-medium text-slate-600 mb-1">Take a photo</p>
+                    <p class="text-sm">of any math, science, or complex problem</p>
+                </div>
+
+                <!-- Image Preview State -->
+                <img id="imagePreview" class="hidden w-full h-full object-contain max-h-[400px]" alt="Problem Preview">
+                
+                <!-- Clear Button -->
+                <button id="clearBtn" onclick="clearImage()" class="hidden absolute top-3 right-3 bg-black/50 text-white w-8 h-8 rounded-full hover:bg-black/70 flex items-center justify-center backdrop-blur-sm transition-all">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Controls -->
+            <div class="p-5">
+                <!-- Hidden Inputs for Gallery and Camera Selection -->
+                <input type="file" id="galleryInput" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+                <input type="file" id="cameraInput" accept="image/*" capture="camera" class="hidden" onchange="handleFileSelect(event)">
+                
+                <div class="flex gap-3">
+                    <!-- Select Button -->
+                    <button onclick="showSelectionModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-image"></i> Select
+                    </button>
+                    <!-- Solve Button -->
+                    <button id="solveBtn" onclick="solveProblem()" disabled class="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-indigo-200 disabled:shadow-none flex items-center justify-center gap-2">
+                        <span id="solveBtnText">Solve Problem</span>
+                        <div id="solveLoader" class="solver-ring-loader hidden w-7 h-7"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Card (Hidden Initially) -->
+        <div id="resultCard" class="hidden glass-panel bg-white rounded-3xl shadow-xl p-6 transition-all duration-500 transform translate-y-4 opacity-0">
+            <div class="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+                <i class="fa-solid fa-lightbulb text-indigo-500"></i>
+                <h2 class="font-bold text-slate-800 text-lg">Detailed Solution</h2>
+            </div>
+            <div id="resultContent" class="markdown-body text-sm text-slate-600">
+                <!-- AI Output goes here -->
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="mt-6 flex justify-end gap-2 pt-4 border-t border-slate-100">
+                 <button onclick="copyResult()" class="text-xs font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 py-2 px-3 rounded-lg hover:bg-indigo-50 transition-colors">
+                    <i class="fa-regular fa-copy"></i> Copy Solution
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+<!-- Selection Modal (Gallery/Camera Pop-up) -->
+    <div id="selectionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-end justify-center p-0 md:p-4" onclick="if(event.target.id === 'selectionModal') hideSelectionModal()">
+        <div id="selectionModalContent" class="bg-white w-full max-w-sm p-6 rounded-t-xl md:rounded-3xl shadow-2xl modal-slide-in transform">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Select Image From</h3>
+                <button onclick="hideSelectionModal()" class="text-slate-400 hover:text-slate-600 text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                
+                <!-- Gallery Option -->
+                <button onclick="triggerGallery()" 
+                        class="w-full flex items-center p-4 text-lg font-medium text-slate-800 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors duration-150 active:ring-2 active:ring-indigo-500 shadow-sm">
+                    <i class="fa-solid fa-images mr-3 text-indigo-600"></i> Gallery / Files
+                </button>
+                
+                <!-- Camera Option -->
+                <button onclick="triggerCamera()" 
+                        class="w-full flex items-center p-4 text-lg font-medium text-slate-800 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-colors duration-150 active:ring-2 active:ring-indigo-500 shadow-sm">
+                    <i class="fa-solid fa-camera mr-3 text-indigo-600"></i> Camera
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Redeem Modal (For Credits) -->
+    <div id="redeemModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 transform transition-all scale-100">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-slate-800">Redeem Credits</h3>
+                <button onclick="hideRedeemModal()" class="text-slate-400 hover:text-slate-600 text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <p id="redeemMessage" class="text-sm text-slate-600 mb-4">
+                You are out of credits! Please enter a redemption code to add more credits.
+            </p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">Passcode</label>
+                    <div class="relative">
+                        <input type="text" id="passcodeInput" placeholder="Enter redemption code" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-800 transition-all">
+                        <i class="fa-solid fa-ticket absolute left-3.5 top-3.5 text-slate-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="redeemPasscode()" class="w-full bg-green-600 text-white font-bold py-3 rounded-xl mt-6 hover:bg-green-700 transition-colors shadow-lg shadow-green-200">
+                Redeem Code
+            </button>
+        </div>
+    </div>
+
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl text-sm font-medium opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        Message
+    </div>
+
+    <script>
+        // --- Global State ---
+        let currentFileBase64 = null;
+        
+        // ******************************************************************************
+        // ********************** IMPORTANT: PASTE YOUR API KEY HERE ********************
+        // ******************************************************************************
+        // NOTE: This key is hardcoded and visible in the source code.
+        let GEMINI_API_KEY = "AIzaSyCyG6SoGnE_zrxIhStvxOrtaN8pGmWa8IA"; 
+        // ******************************************************************************
+        
+        let userCredits = 0; 
+        
+        // --- Constants ---
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent"; 
+        const LOCAL_STORAGE_KEY = "anonSnapSolveCredits";
+        const INITIAL_CREDITS = 30;
+        const CREDIT_COST = 10;
+        const REDEEM_CODE = "UNLOCK";
+        const REDEEM_AMOUNT = 30;
+        const MAX_RETRIES = 3;
+        const INITIAL_BACKOFF_MS = 1000;
+
+        // --- Splash Screen & App Initialization ---
+        function startAppInitialization() {
+            // Load credits immediately (using localStorage is fast)
+            loadCredits(); 
+            
+            // Wait for 1.5 seconds (including the 0.8s logo animation) before fading out
+            setTimeout(() => {
+                const splash = document.getElementById('splashScreen');
+                const appWrapper = document.getElementById('appWrapper');
+
+                // 1. Start fade-out effect for splash
+                splash.style.opacity = '0';
+                
+                // 2. After fade-out finishes (0.5s transition), hide splash and show app
+                setTimeout(() => {
+                    // Ensure the splash screen is completely removed from the flow
+                    splash.style.display = 'none'; 
+                    
+                    // Show the app wrapper (it was initially hidden via CSS display: none)
+                    appWrapper.style.display = 'flex';
+                    document.body.style.overflow = 'auto'; 
+                }, 500); // Wait 500ms for the opacity transition to complete
+            }, 1500); // Total time the splash screen is visible (1.5s)
+        }
+
+
+        // --- Credits Logic using localStorage (Session/Anonymous Persistence) ---
+
+        function loadCredits() {
+            try {
+                const storedCredits = localStorage.getItem(LOCAL_STORAGE_KEY);
+                userCredits = storedCredits !== null ? parseInt(storedCredits, 10) : INITIAL_CREDITS;
+            } catch (e) {
+                console.warn("localStorage not available. Using default credits.");
+                userCredits = INITIAL_CREDITS;
+            }
+            updateCreditsUI(userCredits);
+        }
+
+        function saveCredits(credits) {
+            userCredits = credits;
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, userCredits.toString());
+            } catch (e) {
+                console.warn("Failed to save credits to localStorage.");
+            }
+            updateCreditsUI(userCredits);
+        }
+
+        function updateCreditsUI(credits) {
+            userCredits = credits;
+            document.getElementById('creditsValue').textContent = userCredits;
+            
+            const display = document.getElementById('creditsDisplay');
+            if (userCredits < CREDIT_COST) {
+                display.classList.remove('bg-green-50', 'border-green-200');
+                display.classList.add('bg-red-50', 'border-red-200');
+            } else {
+                display.classList.remove('bg-red-50', 'border-red-200');
+                display.classList.add('bg-green-50', 'border-green-200');
+            }
+        }
+        
+        // --- Redeem Modal Logic ---
+        
+        const redeemModal = document.getElementById('redeemModal');
+
+        function showRedeemModal() {
+            document.getElementById('passcodeInput').value = '';
+            redeemModal.classList.remove('hidden');
+        }
+
+        function hideRedeemModal() {
+            redeemModal.classList.add('hidden');
+        }
+
+        function redeemPasscode() {
+            const input = document.getElementById('passcodeInput');
+            const code = input.value.trim().toUpperCase();
+            
+            if (code === REDEEM_CODE) {
+                const newCredits = userCredits + REDEEM_AMOUNT;
+                saveCredits(newCredits);
+                hideRedeemModal();
+                showToast(`${REDEEM_AMOUNT} Credits Added! Total: ${newCredits}.`);
+            } else {
+                showToast("Invalid redemption code.");
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        // --- Selection Modal Logic (Gallery/Camera) ---
+        
+        const selectionModal = document.getElementById('selectionModal');
+        const selectionModalContent = document.getElementById('selectionModalContent');
+        const galleryInput = document.getElementById('galleryInput');
+        const cameraInput = document.getElementById('cameraInput');
+
+        function showSelectionModal() {
+            selectionModal.classList.remove('hidden');
+            // Timeout to allow CSS transition for modal slide-in effect
+            setTimeout(() => { selectionModalContent.classList.add('active'); }, 10);
+        }
+
+        function hideSelectionModal() {
+            selectionModalContent.classList.remove('active'); 
+            setTimeout(() => { selectionModal.classList.add('hidden'); }, 300);
+        }
+
+        function triggerGallery() {
+            hideSelectionModal();
+            galleryInput.click();
+        }
+
+        function triggerCamera() {
+            hideSelectionModal();
+            cameraInput.click();
+        }
+
+        // --- Core Application Logic (File Select, Solve, etc.) ---
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showToast("Please select an image file.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // UI Updates
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+                const imgPreview = document.getElementById('imagePreview');
+                imgPreview.src = e.target.result;
+                imgPreview.classList.remove('hidden');
+                document.getElementById('clearBtn').classList.remove('hidden');
+                document.getElementById('solveBtn').disabled = false;
+                
+                // Hide previous results
+                document.getElementById('resultCard').classList.add('hidden');
+                document.getElementById('resultCard').classList.remove('translate-y-0', 'opacity-100');
+                
+                // Store Base64 (remove prefix for API)
+                const base64String = e.target.result.split(',')[1];
+                currentFileBase64 = base64String;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            galleryInput.value = ''; 
+            cameraInput.value = '';  
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('clearBtn').classList.add('hidden');
+            document.getElementById('solveBtn').disabled = true;
+            document.getElementById('resultCard').classList.add('hidden');
+            currentFileBase64 = null;
+            showToast("Image cleared. Ready for new photo.");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('opacity-0');
+            toast.style.transform = 'translate(-50%, 0)'; 
+            
+            setTimeout(() => { toast.style.transform = 'translate(-50%, -10px)'; }, 50);
+
+            setTimeout(() => { 
+                toast.style.transform = 'translate(-50%, 0)'; 
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        async function fetchWithRetry(url, options, retries = MAX_RETRIES) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status === 429 || response.status >= 500) {
+                        if (i < retries - 1) {
+                            const delay = INITIAL_BACKOFF_MS * Math.pow(2, i) + Math.random() * 500;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                    }
+                    return response;
+                } catch (error) {
+                    if (i < retries - 1) {
+                        const delay = INITIAL_BACKOFF_MS * Math.pow(2, i) + Math.random() * 500;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+        }
+
+
+        async function solveProblem() {
+            
+            // Check for Hardcoded API Key
+            if (GEMINI_API_KEY === "AIzaSyCyG6SoGnE_zrxIhStvxOrtaN8pGmWa8I" || !GEMINI_API_KEY) {
+                showToast("🔑 Error: Admin API Key is not set in the code. Please update the JavaScript section!");
+                return;
+            }
+
+            // 1. Credit Check
+            if (userCredits < CREDIT_COST) {
+                showToast("Out of credits! Redeem a code to continue.");
+                showRedeemModal();
+                return;
+            }
+
+            if (!currentFileBase64) {
+                 showToast("Please select an image first.");
+                 return;
+            }
+
+            // UI Loading State
+            const btnText = document.getElementById('solveBtnText');
+            const loader = document.getElementById('solveLoader');
+            const btn = document.getElementById('solveBtn');
+            
+            btn.disabled = true;
+            btnText.textContent = "Analyzing...";
+            loader.classList.remove('hidden');
+            
+            // 2. Deduct Credits BEFORE API Call
+            const oldCredits = userCredits;
+            saveCredits(userCredits - CREDIT_COST); 
+
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "You are a world-class tutor and problem solver. Analyze the image provided. 1. Identify the full problem (math, physics, or general knowledge). 2. Provide a clear, step-by-step solution or explanation. 3. Provide the final, clear answer and **wrap that final answer (e.g., '> Final Answer: 42 units') in a Markdown blockquote (>)** to highlight it. Format your response in clean Markdown." },
+                        {
+                            inline_data: {
+                                mime_type: "image/jpeg",
+                                data: currentFileBase64
+                            }
+                        }
+                    ]
+                }]
+            };
+try {
+                // Ensure API URL includes the hardcoded key
+                const apiUrlWithKey = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+                
+                const response = await fetchWithRetry(apiUrlWithKey, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error.message || "An unknown API error occurred.");
+                }
+                
+                const candidate = data.candidates?.[0];
+                const aiText = candidate?.content?.parts?.[0]?.text;
+
+                if (!aiText) {
+                    throw new Error("AI returned an empty response.");
+                }
+                
+                displayResult(aiText);
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                const userMessage = error.message.includes("API key not valid") 
+                    ? "Error: Invalid API Key. Please check the hardcoded key in the script section." 
+                    : "An error occurred while solving. Check console for details.";
+                showToast(userMessage);
+                
+                // IMPORTANT: If API fails, refund the user's credits.
+                saveCredits(oldCredits);
+                showToast("Error occurred. Credits have been refunded.");
+                
+            } finally {
+                // Reset UI
+                btn.disabled = false;
+                btnText.textContent = "Solve Problem";
+                loader.classList.add('hidden');
+            }
+        }
+
+        function displayResult(markdownText) {
+            const resultCard = document.getElementById('resultCard');
+            const contentArea = document.getElementById('resultContent');
+            
+            contentArea.innerHTML = marked.parse(markdownText);
+            resultCard.classList.remove('hidden');
+            
+            setTimeout(() => {
+                resultCard.classList.add('translate-y-0', 'opacity-100');
+                const finalAnswer = document.querySelector('#resultContent blockquote');
+
+                if (finalAnswer) {
+                    finalAnswer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 10);
+        }
+
+        function copyResult() {
+            const text = document.getElementById('resultContent').innerText;
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = text;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                // Use document.execCommand('copy') for compatibility in iframes
+                document.execCommand('copy');
+                showToast("Solution copied to clipboard!");
+            } catch (err) {
+                showToast("Failed to copy text.");
+            }
+            document.body.removeChild(tempTextArea);
+        }
+
+        // The body onload event now calls startAppInitialization()
+    </script>
+</body>
+</html>
